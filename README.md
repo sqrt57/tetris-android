@@ -30,7 +30,7 @@ src/
   lib.rs         android_main entry point, event loop.
   renderer.rs    wgpu surface bound to the current ANativeWindow.
   lifecycle.rs   Owns the renderer across surface-destroyed/recreated events.
-  input.rs       Stub — touch input not wired up yet.
+  input.rs       Touch gesture classification (zone tap / swipe) into game actions.
 app/             Gradle module: manifest, GameActivity Kotlin stub, resources.
 ```
 
@@ -55,7 +55,7 @@ Working through the build-steps table from the original research spec:
 - [x] Step 1 — wgpu surface, clears to a solid color
 - [x] Step 2 — suspend/resume lifecycle (renderer torn down on `TerminateWindow`, rebuilt on `InitWindow`)
 - [x] Step 3 — fixed-timestep game loop drives `game::Game::tick()`
-- [ ] Step 4 — touch input (left/right/rotate/drop)
+- [x] Step 4 — touch input: zone tap (left/right/rotate), swipe down (soft/hard drop)
 - [x] Step 5 — Tetris game logic (pure Rust, unit-tested)
 - [ ] Step 6 — render the board via wgpu (currently just clears to a color)
 - [ ] Step 7 — soft keyboard / IME

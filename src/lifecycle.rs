@@ -38,4 +38,10 @@ impl AppState {
             renderer.render();
         }
     }
+
+    /// Current surface width in pixels, or 0 while there is no window (used to
+    /// classify touch zones; a spurious 0-width frame just drops the input).
+    pub fn width(&self) -> u32 {
+        self.renderer.as_ref().map_or(0, |r| r.width())
+    }
 }

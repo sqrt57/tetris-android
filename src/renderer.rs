@@ -81,6 +81,10 @@ impl Renderer {
         self.surface.configure(&self.device, &self.config);
     }
 
+    pub fn width(&self) -> u32 {
+        self.config.width
+    }
+
     /// Clears the frame to a solid color. Tetris board rendering lands in a later step.
     pub fn render(&mut self) {
         let frame = match self.surface.get_current_texture() {

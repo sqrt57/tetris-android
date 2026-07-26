@@ -21,6 +21,7 @@ fn android_main(app: AndroidApp) {
     log::info!("tetris-android starting");
 
     let mut state = lifecycle::AppState::new();
+    let mut touch = input::TouchInput::new();
     let mut game = game::Game::new(0x5EED);
     let tick_interval = Duration::from_millis(500);
     let mut last_tick = Instant::now();
@@ -52,6 +53,26 @@ fn android_main(app: AndroidApp) {
                 }
             }
         });
+
+        for action in touch.poll(&app, state.width()) {
+            match action {
+                input::Action::MoveLeft => {
+                    game.move_by(-1, 0);
+                }
+                input::Action::MoveRight => {
+                    game.move_by(1, 0);
+                }
+                input::Action::RotateClockwise => {
+                    game.rotate_cw();
+                }
+                input::Action::SoftDrop => {
+                    game.move_by(0, 1);
+                }
+                input::Action::HardDrop => {
+                    game.hard_drop();
+                }
+            }
+        }
 
         if last_tick.elapsed() >= tick_interval {
             game.tick();
