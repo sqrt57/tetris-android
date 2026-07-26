@@ -79,6 +79,6 @@ fn android_main(app: AndroidApp) {
             last_tick = Instant::now();
         }
 
-        state.render();
+        state.render(&game);
     }
 }

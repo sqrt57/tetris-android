@@ -57,14 +57,14 @@ Working through the build-steps table from the original research spec:
 - [x] Step 3 — fixed-timestep game loop drives `game::Game::tick()`
 - [x] Step 4 — touch input: zone tap (left/right/rotate), swipe down (soft/hard drop)
 - [x] Step 5 — Tetris game logic (pure Rust, unit-tested)
-- [ ] Step 6 — render the board via wgpu (currently just clears to a color)
+- [x] Step 6 — render the board via wgpu (instanced quads: locked cells + falling piece, per-`Kind` color)
 - [ ] Step 7 — soft keyboard / IME
 - [ ] Step 8 — screen rotation / config changes
 
 `./gradlew assembleDebug` succeeds end to end (Rust cross-compile for arm64-v8a
 and x86_64 via the `cargoBuild` task, then the Gradle/Kotlin/manifest side).
-Not yet run on a device or emulator — no AVD was set up in the environment
-this was scaffolded in.
+Verified running on a physical device (touch input, board rendering); no AVD
+is set up.
 
 ## Toolchain
 

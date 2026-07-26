@@ -79,7 +79,7 @@ impl Piece {
         Piece { kind, rotation: 0, x: (BOARD_WIDTH as i32 - 4) / 2, y: -1 }
     }
 
-    fn cells(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
+    pub fn cells(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
         let s = shape(self.kind, self.rotation);
         (0..4).flat_map(move |gy| {
             (0..4).filter_map(move |gx| {

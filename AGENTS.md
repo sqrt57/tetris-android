@@ -23,10 +23,14 @@ cargo ndk -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build
 ./gradlew assembleDebug
 ```
 
-There is no device or emulator configured in the environment this was
-scaffolded in, so nothing here has been run interactively — only compiled and
-packaged. Treat anything gesture/rendering-related (touch zone thresholds,
-actual frame output) as unverified until it's been run on a device/AVD.
+No AVD is configured, but a physical device is sometimes connected via
+`adb` (check `adb devices` — don't assume either way). When one is present,
+`adb install -r app/build/outputs/apk/debug/app-debug.apk` and
+`adb shell am start -n com.sqrt57.tetris/.MainActivity` actually exercise the
+gesture/rendering paths instead of leaving them as compiled-but-unverified.
+`adb install` can fail with `INSTALL_FAILED_USER_RESTRICTED` if "Install via
+USB" is off or an on-device confirmation dialog is pending — that needs a
+human to clear on the device itself, agents can't dismiss it.
 
 ## Toolchain (already set up on this machine as of 2026-07-26)
 
@@ -37,8 +41,8 @@ actual frame output) as unverified until it's been run on a device/AVD.
   missing SDK components, as it did for build-tools 34 on first run)
 - Gradle: no system install: `gradlew`/`gradlew.bat` vendor Gradle 8.10.2 via
   the wrapper (`gradle/wrapper/gradle-wrapper.jar` is committed)
-- No AVD created, no physical device attached — check `adb devices` before
-  assuming a target is available
+- No AVD created; a physical device is sometimes attached — check
+  `adb devices` before assuming a target is available either way
 
 ## Architecture notes / known gotchas
 

@@ -2,6 +2,7 @@
 //! The GPU surface and everything built from it must be dropped before the
 //! ANativeWindow it was created from, and rebuilt when a new window arrives.
 
+use crate::game::Game;
 use crate::renderer::Renderer;
 use ndk::native_window::NativeWindow;
 
@@ -33,9 +34,9 @@ impl AppState {
         }
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, game: &Game) {
         if let Some(renderer) = &mut self.renderer {
-            renderer.render();
+            renderer.render(game);
         }
     }
 
