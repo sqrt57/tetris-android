@@ -5,8 +5,8 @@ lower-level stack Bevy uses on Android — no winit, no game engine — to hit
 Bevy's Android pain points firsthand (surface lifecycle, GameActivity, IME,
 rotation) and produce a reproducible test bed for contributing fixes upstream.
 
-See [developer-kb: bevy-android](https://github.com/sqrt57/developer-kb/blob/main/ideas/bevy-android.md)
-for the research and rationale behind this project.
+See [design/](design/README.md) for the research and rationale behind this project
+(also kept canonically in [developer-kb: bevy-android](https://github.com/sqrt57/developer-kb/blob/main/ideas/bevy-android.md)).
 
 ## Stack
 
