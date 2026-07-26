@@ -67,16 +67,21 @@ Verified running on a physical device (touch input, board rendering,
 soft-keyboard name entry on game over, portrait/landscape rotation); no AVD
 is set up.
 
-All 8 build steps from the original spec are done. The board is not yet
-resized/rebalanced for landscape beyond simple re-centering (it stays
-portrait-shaped with wide side margins).
+All 8 build steps from the original spec are done. The board itself still
+isn't resized for landscape — cells stay a fixed square size rather than
+stretching to fill the width — but the side margins that produces are no
+longer wasted space (see below).
 
 A small 5x7 bitmap font (`src/font.rs`, rendered as the same instanced quads
 as the board — no textures, no font library) draws the live score and the
-in-progress high-score name in the margin above the board. That margin is
-deliberately the *only* place text is drawn: the soft keyboard covers the
-rest of the screen during name entry, and on 3-button-nav devices the bottom
-margin sits under the system nav bar.
+in-progress high-score name. In portrait, where the margin above the board
+is thin, that's the only place text goes — the soft keyboard covers the rest
+of the screen during name entry, and on 3-button-nav devices the bottom
+margin sits under the system nav bar. In landscape, the board's fixed cell
+size leaves a wide margin on either side; once that margin is at least a few
+cells wide, the renderer uses the right-hand one for a side panel instead:
+score/name text plus a live "NEXT" piece preview (`Kind::preview_cells` in
+`src/game.rs`).
 
 ## Toolchain
 

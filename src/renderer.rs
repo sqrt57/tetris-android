@@ -78,6 +78,10 @@ const CELL_INSET: f32 = 0.06;
 /// Size of one glyph pixel, as a fraction of a board cell — keeps a 7-row-tall
 /// glyph within the margin above/below the board.
 const GLYPH_PIXEL_SCALE: f32 = 0.12;
+/// Minimum left/right margin (in cells) before it's worth drawing a side
+/// panel there instead of leaving it empty — below this, fall back to
+/// text-in-the-top-margin like the portrait layout has always done.
+const SIDE_PANEL_MIN_MARGIN_CELLS: f32 = 3.0;
 
 /// Maps board layout (in pixels, top-left origin, y-down) to clip space
 /// (bottom-left origin, y-up) for a screen of `screen_w` x `screen_h` pixels.
@@ -111,16 +115,37 @@ impl BoardLayout {
 
     /// Instance rect for board cell (col, row), inset by `inset_frac` of a cell on each side.
     fn cell_instance(&self, col: i32, row: i32, inset_frac: f32, color: [f32; 4]) -> Instance {
-        let inset = self.cell_px * inset_frac;
-        let x0_px = self.board_left_px + col as f32 * self.cell_px + inset;
-        let x1_px = self.board_left_px + (col + 1) as f32 * self.cell_px - inset;
-        let y0_px = self.board_top_px + row as f32 * self.cell_px + inset;
-        let y1_px = self.board_top_px + (row + 1) as f32 * self.cell_px - inset;
+        self.pixel_cell_instance(
+            self.board_left_px + col as f32 * self.cell_px,
+            self.board_top_px + row as f32 * self.cell_px,
+            self.cell_px,
+            inset_frac,
+            color,
+        )
+    }
+
+    /// A `size_px` square at explicit pixel coords (top-left origin), inset by
+    /// `inset_frac` of its size on each side. Same visual language as board
+    /// cells but not tied to the board grid — used by the next-piece preview
+    /// in the landscape side panel.
+    fn pixel_cell_instance(
+        &self,
+        x0_px: f32,
+        y0_px: f32,
+        size_px: f32,
+        inset_frac: f32,
+        color: [f32; 4],
+    ) -> Instance {
+        let inset = size_px * inset_frac;
+        let x0 = x0_px + inset;
+        let x1 = x0_px + size_px - inset;
+        let y0 = y0_px + inset;
+        let y1 = y0_px + size_px - inset;
 
         // Pixel y grows downward, clip-space y grows upward, so the pixel
-        // *bottom* (y1_px) becomes the clip-space rect's bottom-left origin.
-        let bottom_left = self.px_to_clip(x0_px, y1_px);
-        let top_right = self.px_to_clip(x1_px, y0_px);
+        // *bottom* (y1) becomes the clip-space rect's bottom-left origin.
+        let bottom_left = self.px_to_clip(x0, y1);
+        let top_right = self.px_to_clip(x1, y0);
         Instance {
             offset: bottom_left,
             size: [top_right[0] - bottom_left[0], top_right[1] - bottom_left[1]],
@@ -334,21 +359,51 @@ impl Renderer {
                 }
             }
         }
-        // Text always goes in the *top* margin, never the bottom: the soft
-        // keyboard covers the bottom margin (and the rest of the screen)
-        // during name entry, and on 3-button-nav devices the bottom margin
-        // also sits under the system nav bar's scrim. Score and name-entry
-        // text share the one slot rather than needing two, since name entry
-        // only ever happens once the game (and so the score) is frozen.
+        // Score/name text never goes in the *bottom* margin: the soft
+        // keyboard covers it (and the rest of the screen) during name entry,
+        // and on 3-button-nav devices it also sits under the system nav
+        // bar's scrim. Score and name-entry text share one slot rather than
+        // needing two, since name entry only happens once the game (and so
+        // the score) is frozen.
         let glyph_px = layout.cell_px * GLYPH_PIXEL_SCALE;
         let glyph_h = font::GLYPH_ROWS as f32 * glyph_px;
-        let top_margin_h = layout.board_top_px;
-        let text_y0 = ((top_margin_h - glyph_h) / 2.0).max(0.0);
         let (text, color) = match name_entry_text {
             Some(text) => (text.to_string(), NAME_TEXT_COLOR),
             None => (format!("SCORE {}", game.score), SCORE_TEXT_COLOR),
         };
-        instances.extend(layout.text_instances(&text, layout.board_left_px, text_y0, glyph_px, color));
+
+        let board_right_px = layout.board_left_px + layout.cell_px * BOARD_WIDTH as f32;
+        let side_margin_w = layout.board_left_px; // board is centered: left margin == right margin
+        if side_margin_w >= layout.cell_px * SIDE_PANEL_MIN_MARGIN_CELLS {
+            // Landscape: there's real room either side of the board (it's
+            // capped to a fixed cell size, not stretched to fill the width —
+            // see README's landscape-layout note), so use the right margin
+            // for the score/name text plus a next-piece preview instead of
+            // leaving it empty.
+            let pad = layout.cell_px * 0.3;
+            let panel_x0 = board_right_px + pad;
+            let mut y = pad;
+            instances.extend(layout.text_instances(&text, panel_x0, y, glyph_px, color));
+            y += glyph_h + pad * 2.0;
+
+            instances.extend(layout.text_instances("NEXT", panel_x0, y, glyph_px, SCORE_TEXT_COLOR));
+            y += glyph_h + pad;
+
+            for (dx, dy) in game.next.preview_cells() {
+                instances.push(layout.pixel_cell_instance(
+                    panel_x0 + dx as f32 * layout.cell_px,
+                    y + dy as f32 * layout.cell_px,
+                    layout.cell_px,
+                    CELL_INSET,
+                    kind_color(game.next),
+                ));
+            }
+        } else {
+            // Portrait: no side room, so text goes in the (thin) margin above the board.
+            let top_margin_h = layout.board_top_px;
+            let text_y0 = ((top_margin_h - glyph_h) / 2.0).max(0.0);
+            instances.extend(layout.text_instances(&text, layout.board_left_px, text_y0, glyph_px, color));
+        }
 
         let instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("instance_buffer"),

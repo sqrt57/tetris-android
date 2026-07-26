@@ -16,6 +16,17 @@ pub enum Kind {
 
 const ALL_KINDS: [Kind; 7] = [Kind::I, Kind::O, Kind::T, Kind::S, Kind::Z, Kind::J, Kind::L];
 
+impl Kind {
+    /// Cells of this kind's rotation-0 shape within its 4x4 bounding box, with
+    /// no board position — for the renderer's next-piece preview panel.
+    pub fn preview_cells(self) -> impl Iterator<Item = (i32, i32)> {
+        let s = shape(self, 0);
+        (0..4)
+            .flat_map(move |gy| (0..4).map(move |gx| (gx, gy)))
+            .filter(move |&(gx, gy)| s[gy as usize][gx as usize])
+    }
+}
+
 /// Each rotation is a 4x4 grid of occupied cells, row-major, top-left origin.
 /// Standard guideline spawn orientations; only 0/90/180/270 are modeled (no wall kicks).
 fn shape(kind: Kind, rotation: u8) -> [[bool; 4]; 4] {
@@ -232,6 +243,15 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_cells_have_four_cells_within_bounding_box() {
+        for &kind in &ALL_KINDS {
+            let cells: Vec<(i32, i32)> = kind.preview_cells().collect();
+            assert_eq!(cells.len(), 4, "{kind:?} preview should have 4 cells");
+            assert!(cells.iter().all(|&(x, y)| (0..4).contains(&x) && (0..4).contains(&y)));
+        }
+    }
 
     #[test]
     fn spawn_piece_fits_on_empty_board() {
