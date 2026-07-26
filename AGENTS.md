@@ -82,6 +82,14 @@ human to clear on the device itself, agents can't dismiss it.
   instead of recreating the Activity. `game`/`name_entry` state is untouched
   across rotation; don't reintroduce `screenOrientation="portrait"` — that's
   exactly the config-change path Step 8 exercises.
+- The physical test device seen so far is MIUI/Xiaomi-based (Android 16). Its
+  logcat is noisy with device-specific lines that look alarming but aren't
+  app bugs: `avc: denied ... miuilog`/`vendor_displayfeature_prop` (SELinux
+  denials for paths the app was never granted, and doesn't need),
+  `MiuiFreeFormManagerService`/`BarFollowAnimation` freeform-window chatter,
+  and `FileUtils: Failed to chmod(/data/miuilog/...)`. Don't chase these when
+  triaging a real crash — filter logcat by `--pid` and look for
+  `FATAL EXCEPTION` / `panicked` instead.
 - Git identity in this repo should be `Dmitry Grigoryev
   <1461123+sqrt57@users.noreply.github.com>` (personal GitHub identity, not
   the machine's global work email) — check `git config --local user.email`
