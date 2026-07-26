@@ -59,12 +59,18 @@ Working through the build-steps table from the original research spec:
 - [x] Step 5 — Tetris game logic (pure Rust, unit-tested)
 - [x] Step 6 — render the board via wgpu (instanced quads: locked cells + falling piece, per-`Kind` color)
 - [x] Step 7 — soft keyboard / IME (high-score name prompt on game over, via `android-activity`'s `TextEvent`/`TextAction` bridge)
-- [ ] Step 8 — screen rotation / config changes
+- [x] Step 8 — screen rotation / config changes (orientation unlocked; `WindowResized`/`ConfigChanged` reconfigure the wgpu surface in place, no Activity recreation)
 
 `./gradlew assembleDebug` succeeds end to end (Rust cross-compile for arm64-v8a
 and x86_64 via the `cargoBuild` task, then the Gradle/Kotlin/manifest side).
 Verified running on a physical device (touch input, board rendering,
-soft-keyboard name entry on game over); no AVD is set up.
+soft-keyboard name entry on game over, portrait/landscape rotation); no AVD
+is set up.
+
+All 8 build steps from the original spec are done. The board is not yet
+resized/rebalanced for landscape beyond simple re-centering (it stays
+portrait-shaped with wide side margins), and there's still no font/glyph
+rendering — the high-score name is captured but not drawn as text.
 
 ## Toolchain
 

@@ -47,6 +47,21 @@ fn android_main(app: AndroidApp) {
                         if let Some(window) = app.native_window() {
                             let width = window.width().max(0) as u32;
                             let height = window.height().max(0) as u32;
+                            log::info!("window resized: {width}x{height}");
+                            state.on_window_resized(width, height);
+                        }
+                    }
+                    MainEvent::ConfigChanged { .. } => {
+                        // Rotation/config changes are handled in-process (see
+                        // `configChanges` in AndroidManifest.xml) rather than
+                        // recreating the Activity, so `game`/`name_entry` state
+                        // survives untouched. GameActivity is expected to also
+                        // fire WindowResized when the surface itself changes
+                        // size, but re-sync here too as a defensive fallback.
+                        if let Some(window) = app.native_window() {
+                            let width = window.width().max(0) as u32;
+                            let height = window.height().max(0) as u32;
+                            log::info!("config changed, window now {width}x{height}");
                             state.on_window_resized(width, height);
                         }
                     }

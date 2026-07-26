@@ -75,6 +75,13 @@ human to clear on the device itself, agents can't dismiss it.
   `app/src/main/res/values/themes.xml` (`Theme.Tetris`) and its
   `android:theme` reference in `AndroidManifest.xml` — don't drop either,
   the app crashes on launch (before any Rust code runs) without them.
+- `AndroidManifest.xml`'s `<activity>` has no `android:screenOrientation`
+  (unlocked — follows the device's sensor/rotation-lock setting) and declares
+  `android:configChanges` covering orientation/screenSize/etc., so Android
+  handles rotation in-process (`MainEvent::WindowResized`/`ConfigChanged`)
+  instead of recreating the Activity. `game`/`name_entry` state is untouched
+  across rotation; don't reintroduce `screenOrientation="portrait"` — that's
+  exactly the config-change path Step 8 exercises.
 - Git identity in this repo should be `Dmitry Grigoryev
   <1461123+sqrt57@users.noreply.github.com>` (personal GitHub identity, not
   the machine's global work email) — check `git config --local user.email`
