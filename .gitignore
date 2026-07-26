@@ -1,0 +1,17 @@
+# Rust
+/target/
+
+# Gradle / Android
+.gradle/
+/build/
+/app/build/
+/app/src/main/jniLibs/
+local.properties
+*.iml
+.idea/
+.cxx/
+captures/
+.externalNativeBuild/
+
+# Gradle wrapper distribution cache (jar is committed, downloaded dist is not)
+gradle/wrapper/dists/

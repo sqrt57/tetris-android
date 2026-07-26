@@ -1,0 +1,73 @@
+# tetris-android
+
+A Tetris implementation in native Rust/NDK, deliberately built on the same
+lower-level stack Bevy uses on Android — no winit, no game engine — to hit
+Bevy's Android pain points firsthand (surface lifecycle, GameActivity, IME,
+rotation) and produce a reproducible test bed for contributing fixes upstream.
+
+See [developer-kb: bevy-android](https://github.com/sqrt57/developer-kb/blob/main/ideas/bevy-android.md)
+for the research and rationale behind this project.
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Language | Rust |
+| Windowing / lifecycle | [`android-activity`](https://github.com/rust-mobile/android-activity) (GameActivity backend) — the same crate Bevy uses |
+| Rendering | `wgpu` (Vulkan backend) — the same renderer Bevy uses |
+| Android shell | Jetpack `GameActivity`, thin Kotlin stub (~10 lines) |
+| Build | Cargo + `cargo-ndk` + Gradle |
+
+`minSdk = 31` (Android 12, GameActivity/Vulkan baseline), `targetSdk = 36`,
+`compileSdk = 36`.
+
+## Project layout
+
+```
+src/
+  game.rs        Pure Tetris logic — board, pieces, gravity, line clear. No
+                 Android/GPU deps, fully unit-testable on desktop.
+  lib.rs         android_main entry point, event loop.
+  renderer.rs    wgpu surface bound to the current ANativeWindow.
+  lifecycle.rs   Owns the renderer across surface-destroyed/recreated events.
+  input.rs       Stub — touch input not wired up yet.
+app/             Gradle module: manifest, GameActivity Kotlin stub, resources.
+```
+
+## Build
+
+```bash
+# Rust side: cross-compiles for device (arm64) and emulator (x86_64), drops
+# the .so into app/src/main/jniLibs. Runs automatically before every Gradle
+# build via the cargoBuild task in app/build.gradle.kts.
+cargo ndk -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build
+
+# Full APK
+./gradlew assembleDebug
+```
+
+`game.rs` has no Android dependencies and runs under a normal host `cargo test`.
+
+## Status
+
+Working through the build-steps table from the original research spec:
+
+- [x] Step 1 — wgpu surface, clears to a solid color
+- [x] Step 2 — suspend/resume lifecycle (renderer torn down on `TerminateWindow`, rebuilt on `InitWindow`)
+- [x] Step 3 — fixed-timestep game loop drives `game::Game::tick()`
+- [ ] Step 4 — touch input (left/right/rotate/drop)
+- [x] Step 5 — Tetris game logic (pure Rust, unit-tested)
+- [ ] Step 6 — render the board via wgpu (currently just clears to a color)
+- [ ] Step 7 — soft keyboard / IME
+- [ ] Step 8 — screen rotation / config changes
+
+`./gradlew assembleDebug` succeeds end to end (Rust cross-compile for arm64-v8a
+and x86_64 via the `cargoBuild` task, then the Gradle/Kotlin/manifest side).
+Not yet run on a device or emulator — no AVD was set up in the environment
+this was scaffolded in.
+
+## Toolchain
+
+- Rust targets: `rustup target add aarch64-linux-android x86_64-linux-android`
+- `cargo install cargo-ndk`
+- Android NDK (installed via Android Studio SDK Manager) and `ANDROID_HOME` set
