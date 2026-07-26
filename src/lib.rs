@@ -1,3 +1,4 @@
+pub mod font;
 pub mod game;
 
 #[cfg(target_os = "android")]
@@ -119,8 +120,8 @@ fn android_main(app: AndroidApp) {
             last_tick = Instant::now();
         }
 
-        let name_entry_chars = name_entry.is_active().then(|| name_entry.text().chars().count());
-        state.render(&game, name_entry_chars);
+        let name_entry_text = name_entry.is_active().then(|| name_entry.text());
+        state.render(&game, name_entry_text);
     }
 }
 

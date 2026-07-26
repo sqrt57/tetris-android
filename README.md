@@ -69,8 +69,14 @@ is set up.
 
 All 8 build steps from the original spec are done. The board is not yet
 resized/rebalanced for landscape beyond simple re-centering (it stays
-portrait-shaped with wide side margins), and there's still no font/glyph
-rendering — the high-score name is captured but not drawn as text.
+portrait-shaped with wide side margins).
+
+A small 5x7 bitmap font (`src/font.rs`, rendered as the same instanced quads
+as the board — no textures, no font library) draws the live score and the
+in-progress high-score name in the margin above the board. That margin is
+deliberately the *only* place text is drawn: the soft keyboard covers the
+rest of the screen during name entry, and on 3-button-nav devices the bottom
+margin sits under the system nav bar.
 
 ## Toolchain
 

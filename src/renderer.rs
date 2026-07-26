@@ -1,6 +1,7 @@
 //! wgpu surface bound to the current ANativeWindow. Owns everything that must be
 //! torn down and rebuilt across Android's surface-destroyed/recreated lifecycle.
 
+use crate::font;
 use crate::game::{Game, Kind, BOARD_HEIGHT, BOARD_WIDTH};
 use ndk::native_window::NativeWindow;
 use raw_window_handle::{
@@ -69,13 +70,14 @@ fn kind_color(kind: Kind) -> [f32; 4] {
 const PANEL_COLOR: [f32; 4] = [0.1, 0.1, 0.16, 1.0];
 /// Panel tint while the high-score name prompt has the soft keyboard up.
 const ENTRY_PANEL_COLOR: [f32; 4] = [0.18, 0.12, 0.05, 1.0];
-const PIP_COLOR: [f32; 4] = [0.95, 0.85, 0.3, 1.0];
+const SCORE_TEXT_COLOR: [f32; 4] = [0.8, 0.85, 0.9, 1.0];
+const NAME_TEXT_COLOR: [f32; 4] = [0.95, 0.85, 0.3, 1.0];
 /// Fraction of a cell's size left as a gap on each side, so locked/falling
 /// blocks read as a grid rather than a solid mass.
 const CELL_INSET: f32 = 0.06;
-/// Name entry is capped at this many visualized characters (see MAX_LEN in
-/// text_entry.rs); extra typed characters just don't grow the pip row further.
-const MAX_NAME_PIPS: usize = 12;
+/// Size of one glyph pixel, as a fraction of a board cell — keeps a 7-row-tall
+/// glyph within the margin above/below the board.
+const GLYPH_PIXEL_SCALE: f32 = 0.12;
 
 /// Maps board layout (in pixels, top-left origin, y-down) to clip space
 /// (bottom-left origin, y-up) for a screen of `screen_w` x `screen_h` pixels.
@@ -139,23 +141,36 @@ impl BoardLayout {
         }
     }
 
-    /// One indicator square per typed character, in a row in the top margin
-    /// above the board (stands in for rendering actual glyphs, which this
-    /// renderer has no font pipeline for).
-    fn pip_instance(&self, index: usize, color: [f32; 4]) -> Instance {
-        let pip_size = self.cell_px * 0.3;
-        let gap = pip_size * 0.3;
-        let x0_px = self.board_left_px + index as f32 * (pip_size + gap);
-        let top_px = (self.board_top_px - gap - pip_size).max(0.0);
-        let bottom_px = top_px + pip_size;
-
-        let bottom_left = self.px_to_clip(x0_px, bottom_px);
-        let top_right = self.px_to_clip(x0_px + pip_size, top_px);
-        Instance {
-            offset: bottom_left,
-            size: [top_right[0] - bottom_left[0], top_right[1] - bottom_left[1]],
-            color,
+    /// Appends one instance per lit pixel of `ch`'s glyph, top-left corner at
+    /// `(x0_px, y0_px)`, each glyph pixel drawn as a `px`-sized square.
+    fn glyph_instances(&self, ch: char, x0_px: f32, y0_px: f32, px: f32, color: [f32; 4], out: &mut Vec<Instance>) {
+        for (row, line) in font::glyph_rows(ch).iter().enumerate() {
+            for (col, cell) in line.chars().enumerate() {
+                if cell != '#' {
+                    continue;
+                }
+                let cx0 = x0_px + col as f32 * px;
+                let cy0 = y0_px + row as f32 * px;
+                let bottom_left = self.px_to_clip(cx0, cy0 + px);
+                let top_right = self.px_to_clip(cx0 + px, cy0);
+                out.push(Instance {
+                    offset: bottom_left,
+                    size: [top_right[0] - bottom_left[0], top_right[1] - bottom_left[1]],
+                    color,
+                });
+            }
         }
+    }
+
+    /// Lays out `text` left-to-right starting at `(x0_px, y0_px)`, one glyph
+    /// after another with a 1-glyph-pixel gap between characters.
+    fn text_instances(&self, text: &str, x0_px: f32, y0_px: f32, px: f32, color: [f32; 4]) -> Vec<Instance> {
+        let mut out = Vec::new();
+        let advance = (font::GLYPH_COLS as f32 + 1.0) * px;
+        for (i, ch) in text.chars().enumerate() {
+            self.glyph_instances(ch, x0_px + i as f32 * advance, y0_px, px, color, &mut out);
+        }
+        out
     }
 }
 
@@ -273,11 +288,11 @@ impl Renderer {
         self.config.width
     }
 
-    /// Draws the board panel, locked cells, and the current falling piece.
-    /// `name_entry_chars`, when `Some`, means the high-score name prompt is
-    /// active: the panel is tinted and one pip is drawn per typed character
-    /// instead of the (frozen) falling piece.
-    pub fn render(&mut self, game: &Game, name_entry_chars: Option<usize>) {
+    /// Draws the board panel, locked cells, the current falling piece, and
+    /// the score. `name_entry_text`, when `Some`, means the high-score name
+    /// prompt is active: the panel is tinted and the typed-so-far text is
+    /// drawn above the board instead of the (frozen) falling piece.
+    pub fn render(&mut self, game: &Game, name_entry_text: Option<&str>) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
@@ -293,7 +308,7 @@ impl Renderer {
 
         let layout = BoardLayout::new(self.config.width, self.config.height);
         let mut instances = Vec::with_capacity(1 + BOARD_WIDTH * BOARD_HEIGHT / 2);
-        let panel_color = if name_entry_chars.is_some() { ENTRY_PANEL_COLOR } else { PANEL_COLOR };
+        let panel_color = if name_entry_text.is_some() { ENTRY_PANEL_COLOR } else { PANEL_COLOR };
         instances.push(layout.panel_instance(panel_color));
         for (row, cells) in game.board.iter().enumerate() {
             for (col, cell) in cells.iter().enumerate() {
@@ -319,11 +334,21 @@ impl Renderer {
                 }
             }
         }
-        if let Some(count) = name_entry_chars {
-            for i in 0..count.min(MAX_NAME_PIPS) {
-                instances.push(layout.pip_instance(i, PIP_COLOR));
-            }
-        }
+        // Text always goes in the *top* margin, never the bottom: the soft
+        // keyboard covers the bottom margin (and the rest of the screen)
+        // during name entry, and on 3-button-nav devices the bottom margin
+        // also sits under the system nav bar's scrim. Score and name-entry
+        // text share the one slot rather than needing two, since name entry
+        // only ever happens once the game (and so the score) is frozen.
+        let glyph_px = layout.cell_px * GLYPH_PIXEL_SCALE;
+        let glyph_h = font::GLYPH_ROWS as f32 * glyph_px;
+        let top_margin_h = layout.board_top_px;
+        let text_y0 = ((top_margin_h - glyph_h) / 2.0).max(0.0);
+        let (text, color) = match name_entry_text {
+            Some(text) => (text.to_string(), NAME_TEXT_COLOR),
+            None => (format!("SCORE {}", game.score), SCORE_TEXT_COLOR),
+        };
+        instances.extend(layout.text_instances(&text, layout.board_left_px, text_y0, glyph_px, color));
 
         let instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("instance_buffer"),
