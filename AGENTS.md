@@ -60,6 +60,12 @@ actual frame output) as unverified until it's been run on a device/AVD.
   of what AGP 8.7.2 was tested against — `gradle.properties` has
   `android.suppressUnsupportedCompileSdk=36` for that; it's intentional, not
   a bug to "fix" by downgrading.
+- `GameActivity` (via `AppCompatActivity.setContentView`) throws
+  `IllegalStateException: You need to use a Theme.AppCompat theme` unless the
+  app's manifest theme descends from `Theme.AppCompat`. See
+  `app/src/main/res/values/themes.xml` (`Theme.Tetris`) and its
+  `android:theme` reference in `AndroidManifest.xml` — don't drop either,
+  the app crashes on launch (before any Rust code runs) without them.
 - Git identity in this repo should be `Dmitry Grigoryev
   <1461123+sqrt57@users.noreply.github.com>` (personal GitHub identity, not
   the machine's global work email) — check `git config --local user.email`
