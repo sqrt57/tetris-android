@@ -60,6 +60,11 @@ human to clear on the device itself, agents can't dismiss it.
   `app.input_events_iter()` returns something you drive with
   `iter.next(|event| -> InputStatus { .. })` in a loop until it returns
   `false`, not a normal `Iterator`. See `src/input.rs`.
+- Only one consumer per frame may drain `app.input_events_iter()` — a second
+  call in the same frame just sees an empty buffer. IME events
+  (`InputEvent::TextEvent`/`TextAction`, driven by `src/text_entry.rs`) are
+  forwarded from the same `input.rs` loop that classifies touch gestures,
+  not polled separately.
 - `app/build.gradle.kts` compiles against `compileSdk = 36`, one version ahead
   of what AGP 8.7.2 was tested against — `gradle.properties` has
   `android.suppressUnsupportedCompileSdk=36` for that; it's intentional, not
@@ -83,7 +88,9 @@ src/
   lib.rs         android_main entry point, event loop.
   renderer.rs    wgpu surface bound to the current ANativeWindow.
   lifecycle.rs   Owns the renderer across surface-destroyed/recreated events.
-  input.rs       Touch gesture classification (zone tap / swipe) into game actions.
+  input.rs       Touch gesture classification (zone tap / swipe) and IME event
+                 forwarding into app-level actions.
+  text_entry.rs  Soft-keyboard-backed name entry (high-score prompt on game over).
 app/             Gradle module: manifest, GameActivity Kotlin stub, resources.
 design/          LLM research/design docs behind this project.
 ```

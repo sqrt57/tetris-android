@@ -6,11 +6,13 @@ mod input;
 mod lifecycle;
 #[cfg(target_os = "android")]
 mod renderer;
+#[cfg(target_os = "android")]
+mod text_entry;
 
 #[cfg(target_os = "android")]
 use android_activity::{AndroidApp, MainEvent, PollEvent};
 #[cfg(target_os = "android")]
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[cfg(target_os = "android")]
 #[no_mangle]
@@ -23,6 +25,8 @@ fn android_main(app: AndroidApp) {
     let mut state = lifecycle::AppState::new();
     let mut touch = input::TouchInput::new();
     let mut game = game::Game::new(0x5EED);
+    let mut name_entry = text_entry::NameEntry::new();
+    let mut high_score: u32 = 0;
     let tick_interval = Duration::from_millis(500);
     let mut last_tick = Instant::now();
     let mut quit = false;
@@ -71,14 +75,41 @@ fn android_main(app: AndroidApp) {
                 input::Action::HardDrop => {
                     game.hard_drop();
                 }
+                input::Action::TextChanged(text) => {
+                    name_entry.set_text(text);
+                }
+                input::Action::TextSubmitted => {
+                    if name_entry.is_active() {
+                        let name = name_entry.submit(&app);
+                        if game.score > high_score {
+                            high_score = game.score;
+                            log::info!("New high score: {high_score} ({name})");
+                        } else {
+                            log::info!("Name entered: {name} (score {})", game.score);
+                        }
+                        game = game::Game::new(seed_from_clock());
+                        last_tick = Instant::now();
+                    }
+                }
             }
         }
 
-        if last_tick.elapsed() >= tick_interval {
+        if game.game_over && !name_entry.is_active() {
+            log::info!("game over (score {}), showing keyboard for name entry", game.score);
+            name_entry.activate(&app);
+        }
+
+        if !game.game_over && last_tick.elapsed() >= tick_interval {
             game.tick();
             last_tick = Instant::now();
         }
 
-        state.render(&game);
+        let name_entry_chars = name_entry.is_active().then(|| name_entry.text().chars().count());
+        state.render(&game, name_entry_chars);
     }
+}
+
+#[cfg(target_os = "android")]
+fn seed_from_clock() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(1)
 }

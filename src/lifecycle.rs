@@ -34,9 +34,9 @@ impl AppState {
         }
     }
 
-    pub fn render(&mut self, game: &Game) {
+    pub fn render(&mut self, game: &Game, name_entry_chars: Option<usize>) {
         if let Some(renderer) = &mut self.renderer {
-            renderer.render(game);
+            renderer.render(game, name_entry_chars);
         }
     }
 

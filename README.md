@@ -58,13 +58,13 @@ Working through the build-steps table from the original research spec:
 - [x] Step 4 — touch input: zone tap (left/right/rotate), swipe down (soft/hard drop)
 - [x] Step 5 — Tetris game logic (pure Rust, unit-tested)
 - [x] Step 6 — render the board via wgpu (instanced quads: locked cells + falling piece, per-`Kind` color)
-- [ ] Step 7 — soft keyboard / IME
+- [x] Step 7 — soft keyboard / IME (high-score name prompt on game over, via `android-activity`'s `TextEvent`/`TextAction` bridge)
 - [ ] Step 8 — screen rotation / config changes
 
 `./gradlew assembleDebug` succeeds end to end (Rust cross-compile for arm64-v8a
 and x86_64 via the `cargoBuild` task, then the Gradle/Kotlin/manifest side).
-Verified running on a physical device (touch input, board rendering); no AVD
-is set up.
+Verified running on a physical device (touch input, board rendering,
+soft-keyboard name entry on game over); no AVD is set up.
 
 ## Toolchain
 

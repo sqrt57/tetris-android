@@ -4,6 +4,11 @@
 //! right, middle third = rotate. Swipe down: short = soft drop, long = hard
 //! drop. Everything else (horizontal swipes, multi-touch) is ignored — this
 //! is deliberately the simplest scheme that covers all five actions.
+//!
+//! Also forwards IME text events (soft-keyboard input, see
+//! `src/text_entry.rs`): `android-activity` delivers those through the same
+//! lending input-event iterator as touch/key events, and only one consumer
+//! per frame may drain it, so this is that one place.
 
 use android_activity::input::{InputEvent, MotionAction};
 use android_activity::{AndroidApp, InputStatus};
@@ -14,6 +19,10 @@ pub enum Action {
     RotateClockwise,
     SoftDrop,
     HardDrop,
+    /// The soft keyboard's text state changed; carries the full current text.
+    TextChanged(String),
+    /// The soft keyboard's action key (Done) was pressed.
+    TextSubmitted,
 }
 
 const TAP_MAX_MOVEMENT: f32 = 24.0;
@@ -68,6 +77,14 @@ impl TouchInput {
                     InputStatus::Handled
                 }
                 InputEvent::KeyEvent(_) => InputStatus::Unhandled,
+                InputEvent::TextEvent(state) => {
+                    actions.push(Action::TextChanged(state.text.clone()));
+                    InputStatus::Handled
+                }
+                InputEvent::TextAction(_) => {
+                    actions.push(Action::TextSubmitted);
+                    InputStatus::Handled
+                }
                 _ => InputStatus::Unhandled,
             });
             if !had_event {

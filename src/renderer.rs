@@ -67,9 +67,15 @@ fn kind_color(kind: Kind) -> [f32; 4] {
 }
 
 const PANEL_COLOR: [f32; 4] = [0.1, 0.1, 0.16, 1.0];
+/// Panel tint while the high-score name prompt has the soft keyboard up.
+const ENTRY_PANEL_COLOR: [f32; 4] = [0.18, 0.12, 0.05, 1.0];
+const PIP_COLOR: [f32; 4] = [0.95, 0.85, 0.3, 1.0];
 /// Fraction of a cell's size left as a gap on each side, so locked/falling
 /// blocks read as a grid rather than a solid mass.
 const CELL_INSET: f32 = 0.06;
+/// Name entry is capped at this many visualized characters (see MAX_LEN in
+/// text_entry.rs); extra typed characters just don't grow the pip row further.
+const MAX_NAME_PIPS: usize = 12;
 
 /// Maps board layout (in pixels, top-left origin, y-down) to clip space
 /// (bottom-left origin, y-up) for a screen of `screen_w` x `screen_h` pixels.
@@ -120,7 +126,7 @@ impl BoardLayout {
         }
     }
 
-    fn panel_instance(&self) -> Instance {
+    fn panel_instance(&self, color: [f32; 4]) -> Instance {
         let top_left = self.px_to_clip(self.board_left_px, self.board_top_px);
         let bottom_right = self.px_to_clip(
             self.board_left_px + self.cell_px * BOARD_WIDTH as f32,
@@ -129,7 +135,26 @@ impl BoardLayout {
         Instance {
             offset: [top_left[0], bottom_right[1]],
             size: [bottom_right[0] - top_left[0], top_left[1] - bottom_right[1]],
-            color: PANEL_COLOR,
+            color,
+        }
+    }
+
+    /// One indicator square per typed character, in a row in the top margin
+    /// above the board (stands in for rendering actual glyphs, which this
+    /// renderer has no font pipeline for).
+    fn pip_instance(&self, index: usize, color: [f32; 4]) -> Instance {
+        let pip_size = self.cell_px * 0.3;
+        let gap = pip_size * 0.3;
+        let x0_px = self.board_left_px + index as f32 * (pip_size + gap);
+        let top_px = (self.board_top_px - gap - pip_size).max(0.0);
+        let bottom_px = top_px + pip_size;
+
+        let bottom_left = self.px_to_clip(x0_px, bottom_px);
+        let top_right = self.px_to_clip(x0_px + pip_size, top_px);
+        Instance {
+            offset: bottom_left,
+            size: [top_right[0] - bottom_left[0], top_right[1] - bottom_left[1]],
+            color,
         }
     }
 }
@@ -249,7 +274,10 @@ impl Renderer {
     }
 
     /// Draws the board panel, locked cells, and the current falling piece.
-    pub fn render(&mut self, game: &Game) {
+    /// `name_entry_chars`, when `Some`, means the high-score name prompt is
+    /// active: the panel is tinted and one pip is drawn per typed character
+    /// instead of the (frozen) falling piece.
+    pub fn render(&mut self, game: &Game, name_entry_chars: Option<usize>) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
@@ -265,7 +293,8 @@ impl Renderer {
 
         let layout = BoardLayout::new(self.config.width, self.config.height);
         let mut instances = Vec::with_capacity(1 + BOARD_WIDTH * BOARD_HEIGHT / 2);
-        instances.push(layout.panel_instance());
+        let panel_color = if name_entry_chars.is_some() { ENTRY_PANEL_COLOR } else { PANEL_COLOR };
+        instances.push(layout.panel_instance(panel_color));
         for (row, cells) in game.board.iter().enumerate() {
             for (col, cell) in cells.iter().enumerate() {
                 if let Some(kind) = cell {
@@ -278,9 +307,21 @@ impl Renderer {
                 }
             }
         }
-        for (x, y) in game.current.cells() {
-            if y >= 0 {
-                instances.push(layout.cell_instance(x, y, CELL_INSET, kind_color(game.current.kind)));
+        if !game.game_over {
+            for (x, y) in game.current.cells() {
+                if y >= 0 {
+                    instances.push(layout.cell_instance(
+                        x,
+                        y,
+                        CELL_INSET,
+                        kind_color(game.current.kind),
+                    ));
+                }
+            }
+        }
+        if let Some(count) = name_entry_chars {
+            for i in 0..count.min(MAX_NAME_PIPS) {
+                instances.push(layout.pip_instance(i, PIP_COLOR));
             }
         }
 
